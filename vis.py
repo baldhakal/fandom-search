@@ -57,10 +57,7 @@ def parse_args():
 def unnan(val):
     # Pandas annoyingly converts the string 'nan' into a floating
     # point nan value, even in an all-string column.
-    if isinstance(val, float) and math.isnan(val):
-        return 'nan'
-    else:
-        return val
+    return 'nan' if isinstance(val, float) and math.isnan(val) else val
 
 def word_formatter(names=None):
     if names is None:
@@ -73,10 +70,9 @@ def word_formatter(names=None):
 
     def span(content, highlight=None):
         if highlight is None:
-            return '<span>{}</span>'.format(content)
-        else:
-            style = 'background-color: rgba(16, 96, 255, {:04.3f})'.format(highlight)
-            return '<span style="{}">{}</span>'.format(style, content)
+            return f'<span>{content}</span>'
+        style = 'background-color: rgba(16, 96, 255, {:04.3f})'.format(highlight)
+        return f'<span style="{style}">{content}</span>'
 
     def format_word(word, prev_word, character, new_char, new_scene, highlight=None):
         character = unnan(character).upper()
@@ -87,9 +83,7 @@ def word_formatter(names=None):
             parts.append(span('-- next scene--<br \>'))
 
         if new_char:
-            parts.append('\n')
-            parts.append(span(' ' + character.upper() + ': '))
-
+            parts.extend(('\n', span(' ' + character.upper() + ': ')))
         if word in punctuation or word in contractions:
             # no space before punctuation
             parts.append(span(word, highlight))
@@ -172,7 +166,7 @@ def join_wrap(seq):
     if tail.strip():
         lines.append(tail)
 
-    return '\n'.join('<div>{}</div>'.format(l) for l in lines)
+    return '\n'.join(f'<div>{l}</div>' for l in lines)
 
 def chart_pivot(chart_cols):
     character_cols = [x for x in chart_cols.columns if x.startswith("CHARACTER_")]
@@ -319,8 +313,7 @@ def build_bar_plot(data_path, words_per_chunk, title='Reuse'):
     emotion_button_group.js_on_change('active', callback)
 
     layout = column(reuse_button_group, emotion_button_group, plot)
-    tab1 = Panel(child=layout, title='Bar')
-    return tab1
+    return Panel(child=layout, title='Bar')
 
 def build_line_plot(data_path, words_per_chunk, title='Reuse'):
     #Read in from csv
@@ -510,8 +503,7 @@ def build_line_plot(data_path, words_per_chunk, title='Reuse'):
 
 
     layout = column(reuse_button_group, emotion_button_group, char_button_group, plot)
-    tab1 = Panel(child=layout, title='Line')
-    return tab1
+    return Panel(child=layout, title='Line')
 
 
 def build_line_plot_compare(data_path, words_per_chunk, title='Degree of Reuse'):
@@ -1170,8 +1162,7 @@ def build_line_plot_affect(data_path, words_per_chunk, title='Degree of Reuse'):
 
 
     layout = column(reuse_button_group, emotion_button_group, plot)
-    tab1 = Panel(child=layout, title='Affect')
-    return tab1
+    return Panel(child=layout, title='Affect')
     # return layout
 
 def build_line_plot_char(data_path, words_per_chunk, title='Degree of Reuse'):
@@ -1476,8 +1467,7 @@ def build_line_plot_char(data_path, words_per_chunk, title='Degree of Reuse'):
 
 
     layout = column(reuse_button_group, mult_char_button_group, plot)
-    tab1 = Panel(child=layout, title='Character')
-    return tab1
+    return Panel(child=layout, title='Character')
     #return layout
 
 def build_line_plot_dropdown(data_path, words_per_chunk, title='Reuse'):
@@ -1657,8 +1647,7 @@ def build_line_plot_dropdown(data_path, words_per_chunk, title='Reuse'):
 
 
     layout = column(reuse_button_group, emotion_dropdown_button_group, char_dropdown_button_group, plot)
-    tab1 = Panel(child=layout, title='Line Dropdown')
-    return tab1
+    return Panel(child=layout, title='Line Dropdown')
 
 def build_plot(args):
     # return Tabs(tabs=[build_line_plot_char(args.input, args.words_per_chunk),

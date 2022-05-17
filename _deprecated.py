@@ -27,8 +27,7 @@ def cosine_distance(row_values, col_values):
 
 def make_match_strata(records, record_structure, num_strata, max_threshold):
     combined_ix = record_structure['fields'].index('BEST_COMBINED_DISTANCE')
-    low = [i / num_strata * max_threshold
-           for i in range(0, num_strata)]
+    low = [i / num_strata * max_threshold for i in range(num_strata)]
     high = [i / num_strata * max_threshold
             for i in range(1, num_strata + 1)]
     ranges = zip(low, high)
@@ -51,8 +50,10 @@ def chart_match_strata(records,
                        legend=True):
     match_strata = make_match_strata(records, new_record_structure, num_strata, max_threshold)
 
-    cumulative_strata = [match_strata[0:i] for i in
-                         range(len(match_strata), 0, -1)]
+    cumulative_strata = [
+        match_strata[:i] for i in range(len(match_strata), 0, -1)
+    ]
+
     match_counters = [Counter(row[4] for matches in strata for row in matches)
                       for strata in cumulative_strata]
     maxn = max(max(mc) for mc in match_counters if mc)
@@ -74,7 +75,6 @@ def most_frequent_matches(records, n_matches, threshold):
     matches = ct.most_common(n_matches)
     return [(i, c, ix_to_context[i])
             for i, c in matches]
-    return matches
 
 # ----------------
 # matrix functions
@@ -115,8 +115,12 @@ class StrictNgramDedupe(object):
                                  if self.no_better_match(ng)]
 
     def num_ngrams(self):
-        return len(set(int(ng[0]['ORIGINAL_SCRIPT_WORD_INDEX'])
-                       for ng in self.filtered_matches))
+        return len(
+            {
+                int(ng[0]['ORIGINAL_SCRIPT_WORD_INDEX'])
+                for ng in self.filtered_matches
+            }
+        )
 
     def match_to_phrase(self, match):
         return ' '.join(m['ORIGINAL_SCRIPT_WORD'].lower() for m in match)
@@ -181,8 +185,8 @@ class StrictNgramDedupe(object):
             liwc_count = [liwc.lex_count(p) for p in phrases]
             liwc_sent_count = self.project_sentiment_keys(liwc_count,
                                                           ['POSEMO', 'NEGEMO'])
-            liwc_other_keys = set(k for ct in liwc_count for k in ct.keys())
-            liwc_other_keys -= set(['POSEMO', 'NEGEMO'])
+            liwc_other_keys = {k for ct in liwc_count for k in ct.keys()}
+            liwc_other_keys -= {'POSEMO', 'NEGEMO'}
             liwc_other_count = self.project_sentiment_keys(liwc_count,
                                                            liwc_other_keys)
 
@@ -190,30 +194,23 @@ class StrictNgramDedupe(object):
         count_labels = []
 
         if emolex:
-            counts.append(emo_emo_count)
-            counts.append(emo_sent_count)
-            count_labels.append('NRC_EMOTION_')
-            count_labels.append('NRC_SENTIMENT_')
-
+            counts.extend((emo_emo_count, emo_sent_count))
+            count_labels.extend(('NRC_EMOTION_', 'NRC_SENTIMENT_'))
         counts.append(bing_count)
         count_labels.append('BING_SENTIMENT_')
 
         if liwc:
-            counts.append(liwc_sent_count)
-            counts.append(liwc_other_count)
-            count_labels.append('LIWC_SENTIMENT_')
-            count_labels.append('LIWC_ALL_OTHER_')
-
+            counts.extend((liwc_sent_count, liwc_other_count))
+            count_labels.extend(('LIWC_SENTIMENT_', 'LIWC_ALL_OTHER_'))
         rows = self.compile_sentiment_groups(counts, count_labels)
 
         for r, p, i in zip(rows, phrases, phrase_indices):
-            r['{}-GRAM'.format(self.ngram_size)] = p
-            r['{}-GRAM_START_INDEX'.format(self.ngram_size)] = i
+            r[f'{self.ngram_size}-GRAM'] = p
+            r[f'{self.ngram_size}-GRAM_START_INDEX'] = i
 
-        fieldnames = sorted(set(k for r in rows for k in r.keys()))
+        fieldnames = sorted({k for r in rows for k in r.keys()})
         totals = collections.defaultdict(int)
-        skipkeys = ['{}-GRAM_START_INDEX'.format(self.ngram_size),
-                    '{}-GRAM'.format(self.ngram_size)]
+        skipkeys = [f'{self.ngram_size}-GRAM_START_INDEX', f'{self.ngram_size}-GRAM']
         totals[skipkeys[0]] = 0
         totals[skipkeys[1]] = '(total)'
         for r in rows:
@@ -231,11 +228,7 @@ class StrictNgramDedupe(object):
         counts = [{k: ct.get(k, 0) for k in keys}
                   for ct in counts]
         for ct in counts:
-            if sum(ct.values()) == 0:
-                ct['UNDETERMINED'] = 1
-            else:
-                ct['UNDETERMINED'] = 0
-
+            ct['UNDETERMINED'] = 1 if sum(ct.values()) == 0 else 0
         return counts
 
     def compile_sentiment_groups(self, groups, prefixes):
@@ -307,8 +300,10 @@ def process(inputs):
     in_file = inputs['i']
     out_prefix = inputs['m']
 
-    matrix_out = '{}-most-common-perfect-matches-no-overlap-{}-gram-match-matrix.csv'.format(out_prefix, ngram_size)
-    sentiment_out = '{}-most-common-perfect-matches-no-overlap-{}-gram-sentiment.csv'.format(out_prefix, ngram_size)
+    matrix_out = f'{out_prefix}-most-common-perfect-matches-no-overlap-{ngram_size}-gram-match-matrix.csv'
+
+    sentiment_out = f'{out_prefix}-most-common-perfect-matches-no-overlap-{ngram_size}-gram-sentiment.csv'
+
 
     dd = StrictNgramDedupe(in_file, ngram_size=ngram_size)
     #print(dd.num_ngrams())

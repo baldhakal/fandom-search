@@ -71,8 +71,7 @@ def convert_dir(args):
         infile = os.path.join(html_dir, infile)
 
         if not os.path.exists(outfile):
-            text = get_fan_work(infile)
-            if text:
+            if text := get_fan_work(infile):
                 with open(outfile, 'w', encoding='utf-8') as out:
                     out.write(text)
             else:
@@ -163,8 +162,7 @@ log_error_id = _error_id_log.log
 
 def load_error_ids():
     with open(_error_id_log.logfile, 'w+') as ip:
-        ids = set(l.strip() for l in ip.readlines())
-        return ids
+        return {l.strip() for l in ip.readlines()}
 
 class InlineDisplay:
     def __init__(self):
@@ -192,11 +190,11 @@ def request_loop(url, timeout=4.0, sleep_base=1.0):
     # we'll try a few more times, and then give up.
 
     orig_url = url
-    for i in range(20):
+    for _ in range(20):
         if sleep_base > 7200:  # Only delay up to an hour.
             sleep_base /= 2
-            url = '{}#{}'.format(orig_url, random.randrange(1000))
-        display('Sleeping for {} seconds;'.format(sleep_base))
+            url = f'{orig_url}#{random.randrange(1000)}'
+        display(f'Sleeping for {sleep_base} seconds;')
         sleep(sleep_base)
         try:
             response = requests.get(url, timeout=timeout)
@@ -205,29 +203,26 @@ def request_loop(url, timeout=4.0, sleep_base=1.0):
         except requests.exceptions.HTTPError:
             code = response.status_code
             if code >= 400 and code < 500:
-                display('Unrecoverable error ({})'.format(code))
+                display(f'Unrecoverable error ({code})')
                 return ''
             else:
                 sleep_base *= 2
-                display('Recoverable error ({});'.format(code))
+                display(f'Recoverable error ({code});')
         except requests.exceptions.ReadTimeout as exc:
             sleep_base *= 2
             display('Read timed out -- trying again;')
         except requests.exceptions.RequestException as exc:
             sleep_base *= 2
             display('Unexpected error ({}), trying again;\n'.format(exc))
-    else:
-        return None
+    return None
 
 def scrape(args):
-    search_term = args.search
     tag = args.tag
     header = args.url
     out_dir = args.out
     end = args.startpage
 
-    # tag scraping option
-    if search_term:
+    if search_term := args.search:
         pp = 1
         safe_search = search_term.replace(' ', '+')
         # an alternative here is to scrape this page and use regex to filter the results:
@@ -238,7 +233,7 @@ def scrape(args):
         print('\nTags:')
 
         tags = ["initialize"]
-        while (len(tags)) != 0:
+        while tags:
             results_page = requests.get(search_ref + str(pp))
             results_soup = BeautifulSoup(results_page.text, "lxml")
             tags = results_soup(attrs={'href': re.compile('^/tags/[^s]....[^?].*')})
@@ -259,9 +254,9 @@ def scrape(args):
         error_works = load_error_ids()
 
         results = ["initialize"]
-        while (len(results)) != 0:
+        while results:
             log('\n\nPAGE ' + str(end))
-            print('Page {} '.format(end))
+            print(f'Page {end} ')
 
             display('Loading table of contents;')
 
@@ -281,8 +276,8 @@ def scrape(args):
             toc_page_soup = BeautifulSoup(toc_page, "lxml")
             results = toc_page_soup(attrs={'href': re.compile('^/works/[0-9]+[0-9]$')})
 
-            log('Number of Works on Page {}: {}'.format(end, len(results)))
-            log('Page URL: {}'.format(request_url))
+            log(f'Number of Works on Page {end}: {len(results)}')
+            log(f'Page URL: {request_url}')
             log('Progress: ')
 
             reset_display()
@@ -290,25 +285,24 @@ def scrape(args):
             for x in results:
                 body = str(x).split('"')
                 docID = str(body[1]).split('/')[2]
-                filename = str(docID) + '.html'
+                filename = f'{str(docID)}.html'
 
                 if os.path.exists(filename):
-                    display('Work {} already exists -- skpping;'.format(docID))
+                    display(f'Work {docID} already exists -- skpping;')
                     reset_display()
                     msg = ('skipped existing document {} on '
                            'page {} ({} bytes)')
                     log(msg.format(docID, str(end),
                                    os.path.getsize(filename)))
                 elif docID in error_works:
-                    display('Work {} is known to cause errors '
-                            '-- skipping;'.format(docID))
+                    display(f'Work {docID} is known to cause errors -- skipping;')
                     reset_display()
                     msg = ('skipped document {} on page {} '
                            'known to cause errors')
                     log(msg.format(docID, str(end)))
 
                 else:
-                    display('Loading work {};'.format(docID))
+                    display(f'Loading work {docID};')
                     work_request_url = "https://archiveofourown.org/" + body[1] + "?view_adult=true&view_full_work=true"
                     work_page = request_loop(work_request_url)
 
@@ -331,14 +325,11 @@ def scrape(args):
 # data visualization format functions
 # -----------------------------------
 def project_sentiment_keys_shortform(counts, keys):
-        counts = [{k: ct.get(k, 0) for k in keys}
-                  for ct in counts]
-        for ct in counts:
-            if sum(ct.values()) == 0:
-                ct['UNDETERMINED'] = 1
-            else:
-                ct['UNDETERMINED'] = 0
-        return counts
+    counts = [{k: ct.get(k, 0) for k in keys}
+              for ct in counts]
+    for ct in counts:
+        ct['UNDETERMINED'] = 1 if sum(ct.values()) == 0 else 0
+    return counts
 
 def regex(name):
     return (re.sub('(?P<name> (\w))*(\\(.*\\))', '\g<name>', name)).strip()
@@ -355,7 +346,7 @@ def format_data(args):
     matches_thresh = matches.assign(**{name: positive_match})
 
     thresholds = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-    threshname = ['Frequency of Reuse (0-{})'.format(str(t)) for t in thresholds]
+    threshname = [f'Frequency of Reuse (0-{str(t)})' for t in thresholds]
     for thresh, name in zip(thresholds, threshname):
         positive_match = matches.BEST_COMBINED_DISTANCE <= thresh
         matches_thresh = matches_thresh.assign(**{name: positive_match})
@@ -468,8 +459,8 @@ def _format_data_sentiment_only(args):
         liwc_sent_DF['ORIGINAL_SCRIPT_INDEX'] = csv_script['ORIGINAL_SCRIPT_INDEX']
         out = pd.merge(out, liwc_sent_DF, on='ORIGINAL_SCRIPT_INDEX')
 
-        liwc_other_keys = set(k for ct in liwc_count for k in ct.keys())
-        liwc_other_keys -= set(['POSEMO', 'NEGEMO']) #already used these
+        liwc_other_keys = {k for ct in liwc_count for k in ct.keys()}
+        liwc_other_keys -= {'POSEMO', 'NEGEMO'}
         liwc_other_count = project_sentiment_keys_shortform(liwc_count, liwc_other_keys)
         liwc_other_DF = pd.DataFrame(liwc_other_count)
         liwc_other_DF['ORIGINAL_SCRIPT_INDEX'] = csv_script['ORIGINAL_SCRIPT_INDEX']

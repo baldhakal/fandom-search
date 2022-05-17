@@ -111,8 +111,7 @@ def build_lsh_engine(orig, window_size, number_of_hashes, hash_dimensions):
 
     hashes = []
     for i in range(number_of_hashes):
-        h = nearpy.hashes.RandomBinaryProjections('rbp{}'.format(i),
-                                                  hash_dimensions)
+        h = nearpy.hashes.RandomBinaryProjections(f'rbp{i}', hash_dimensions)
         hashes.append(h)
 
     engine = nearpy.Engine(vector_dim,
@@ -124,8 +123,7 @@ def build_lsh_engine(orig, window_size, number_of_hashes, hash_dimensions):
     return engine
 
 def multi_search_wrapper(work):
-    result = _ANN_INDEX.search(work)
-    return result
+    return _ANN_INDEX.search(work)
 
 class AnnIndexSearch(object):
     def __init__(self, original_script_filename, window_size,
@@ -237,42 +235,47 @@ def validate_markup_script(filename,
     print()
 
     errs = False
-    unbal_l = _unbalanced_l.findall(script)
-    if unbal_l:
+    if unbal_l := _unbalanced_l.findall(script):
         print('Unbalanced left tag delimiters:')
         for m in _unbalanced_l.finditer(script):
             line = script[:m.start() + 1].count('\n') + 1
-            print('  On line {}'.format(line))
-            print('    {}'.format(m.group().strip()))
+            print(f'  On line {line}')
+            print(f'    {m.group().strip()}')
         errs = True
         print()
 
-    unbal_r = _unbalanced_r.findall(script)
-    if unbal_r:
+    if unbal_r := _unbalanced_r.findall(script):
         print('Unbalanced right tag delimiters:')
         for m in _unbalanced_r.finditer(script):
             line = script[:m.start() + 1].count('\n') + 1
-            print('  On line {}'.format(line))
-            print('    {}'.format(m.group().strip()))
+            print(f'  On line {line}')
+            print(f'    {m.group().strip()}')
         errs = True
         print()
 
-    tag_set = set(t.strip() for t in _tags.findall(script))
-    expected_tags = set(('LINE', 'DIRECTION', 'SCENE_NUMBER', 'SCENE_DESCRIPTION', 'CHARACTER_NAME'))
+    tag_set = {t.strip() for t in _tags.findall(script)}
+    expected_tags = {
+        'LINE',
+        'DIRECTION',
+        'SCENE_NUMBER',
+        'SCENE_DESCRIPTION',
+        'CHARACTER_NAME',
+    }
+
     if tag_set - expected_tags:
         print('Unexpected tag labels:')
         for m in _tags.finditer(script):
             if m.group(1).strip() not in expected_tags:
                 line = script[:m.start(1) + 1].count('\n') + 1
-                print('  On line {}'.format(line))
-                print('    {}'.format(m.group(1).strip()))
+                print(f'  On line {line}')
+                print(f'    {m.group(1).strip()}')
         errs = True
         print()
 
     if not errs:
         print('No markup errors found.')
         return True
-    elif interactive and errs:
+    elif interactive:
         print('Errors were found in the script markup. Do you want to continue? (Default is no.)')
         print()
         r = ''
@@ -300,7 +303,7 @@ def load_markup_script(filename,
         current_scene_error_fix = False
         current_char = None
         rows = [['LOWERCASE', 'SPACY_ORTH_ID', 'SCENE', 'CHARACTER']]
-        for i, line in enumerate(ip):
+        for line in ip:
             if _scene_rex.search(line):
                 current_scene_count += 1
                 scene_string = _scene_rex.search(line).group('scene')
@@ -342,7 +345,7 @@ def analyze(args,
             ):
     fan_work_directory = args.fan_works
     original_script_markup = args.script
-    subsample_start = 0 if args.skip_works < 0 else args.skip_works
+    subsample_start = max(args.skip_works, 0)
     subsample_end = (None if args.num_works < 0 else 
                      args.num_works + subsample_start)
 
@@ -372,9 +375,7 @@ def analyze(args,
                                distance_threshold)
 
     for i, fan_cluster in enumerate(fan_clusters, start=start):
-        print('Processing cluster {} ({}-{})'.format(i,
-                                                     chunk_size * i,
-                                                     chunk_size * (i + 1)))
+        print(f'Processing cluster {i} ({chunk_size * i}-{chunk_size * (i + 1)})')
 
         global _ANN_INDEX
         _ANN_INDEX = ann_index
